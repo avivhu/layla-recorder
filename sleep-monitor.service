@@ -1,0 +1,25 @@
+[Unit]
+Description=Sleep Monitor Recording Service
+After=network.target
+After=graphical-session.target
+Wants=graphical-session.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/dev/layla-recorder
+Environment=HOME=/home/pi
+Environment=USER=pi
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/pi/.local/bin/uv run sleep-monitor.py record
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Ensure camera access
+SupplementaryGroups=video
+
+[Install]
+WantedBy=multi-user.target

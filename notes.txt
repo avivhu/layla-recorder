@@ -1,0 +1,120 @@
+
+rpicam-vid --timeout 1000 --output a.mp4 --codec h264 --width 1920 --height 1080 --segment 1
+
+rpicam-vid --timeout 25000 --width 1920 --height 1080 --codec h264 --inline  --output -| ffmpeg -i - -c copy -movflags +faststart  b.mp4 -y
+
+
+rpicam-vid --timeout 10000 --output a.h264 --codec h264 --width 1920 --height 1080
+
+
+# Run streaming on windows
+ssh pi@rpi4.local "rpicam-vid --width 1920 --height 1080 --nopreview --shutter 30000 --gain 1.5 --inline -t 0 -o -" | ffplay -fflags nobuffer -flags low_delay -framedrop -analyzeduration 1 -i -
+
+ssh pi@rpi4.local "rpicam-vid --width 640 --height 480 --nopreview --shutter 30000 --gain 1.5 --inline -t 0 -o -" | ffplay -fflags nobuffer -flags low_delay -framedrop -analyzeduration 1 -i -
+ssh pi@rpi4.local "rpicam-vid --width 2592 --height 1944 --nopreview --shutter 30000 --gain 1.5 --inline -t 0 -o -" | ffplay -fflags nobuffer -flags low_delay -framedrop -analyzeduration 1 -i -
+
+# H264 compression, lower resolution
+ssh pi@rpi4.local "rpicam-vid --width 1296 --height 972 --nopreview --shutter 30000 --gain 1.5 --inline -t 0 -o -" | ffplay -fflags nobuffer -flags low_delay -framedrop -analyzeduration 1 -i -
+
+# MJPEG - compressed but works at full resolution
+ssh pi@rpi4.local "rpicam-vid --codec mjpeg --width 2592 --height 1944 --nopreview --shutter 30000 --gain 1.5 --inline -t 0 -o -" | ffplay -fflags nobuffer -flags low_delay -framedrop -analyzeduration 1 -i -
+
+
+ssh pi@rpi4.local "rpicam-vid --width 1296 --height 972 --nopreview --inline -t 0 -o -" | ffplay -fflags nobuffer -flags low_delay -framedrop -analyzeduration 1 -i -
+
+
+# Record with audio and annotations
+rpicam-vid \
+  --post-process-file ./annotate.json \
+  --codec libav --libav-audio \
+  --nopreview \
+  --bitrate 2500k \
+  --audio-source alsa --audio-device "sysdefault:CARD=CinemaTM" \
+  --audio-channels 1 \
+  --audio-codec aac \
+  --width 1296 --height 972 --shutter 30000 --gain 1.5 --inline \
+  -t 10000 -o out.mp4
+
+
+rpicam-vid \
+  --codec mjpeg \
+  --width 2592 --height 1944 \
+  --nopreview \
+  --shutter 30000 --gain 1.5 \
+  -t 0 -o - | ffmpeg -i - -f mjpeg -c copy udp://127.0.0.1:5000
+
+
+rpicam-vid \
+  --codec yuv420 \
+  --width 2592 --height 1944 \
+  --nopreview \
+  --shutter 30000 --gain 1.5 \
+  -t 0 -o - | ffmpeg -i - -vf scale=-2:1200 -f mjpeg udp://127.0.0.1:5000?fifo_size=2097152&overrun_nonfatal=1
+
+
+rpicam-vid   --codec mjpeg  --framerate 10  --width 2592 --height 1944   --nopreview   --shutter 30000 --gain 1.5   -t 10000 -o - > mjpeg.bin
+cat mjpeg.bin | ffmpeg -framerate 10 -i - out_%3d.jpg
+# cat mjpeg.bin | ffmpeg -framerate 10 -re -i - -s 640x480 -f mjpeg udp://127.0.0.1:5000 ## downscale on the fly
+# cat mjpeg.bin | ffmpeg -framerate 10 -re -i - -c copy -f mjpeg udp://127.0.0.1:5000 ### SENDER
+cat mjpeg.bin | ffmpeg -framerate 10 -re -i - -c copy -f mjpeg udp://127.0.0.1:5000 ### SENDER
+
+# SENDER (Raspberry Pi) and RECEIVER (PC) commands
+rpicam-vid   --codec mjpeg  --framerate 10  --width 2592 --height 1944   --nopreview   --shutter 30000 --gain 1.5   -t 0 -o - | ffmpeg -re -i - -c copy -f mjpeg  tcp://0.0.0.0:5000?listen=1 ### SENDER 
+ffmpeg -f mjpeg -i tcp://10.0.0.7:5000 -c copy received.mkv # RECEVIER
+
+# GStreamer UDP Streaming (WORKS but has dimension issues)
+# Extract frames first:
+gst-launch-1.0 filesrc location=out.bin ! jpegparse ! multifilesink location=frame_%05d.jpg
+
+# Sender (streams extracted frames):
+gst-launch-1.0 -v multifilesrc location=frame_%05d.jpg loop=true caps="image/jpeg,framerate=10/1" ! jpegdec ! videoconvert ! jpegenc ! rtpjpegpay pt=26 ! udpsink host=127.0.0.1 port=5000
+
+# Receiver (gets Invalid Dimension 0x0 errors - needs fixing):
+gst-launch-1.0 udpsrc port=5000 caps="application/x-rtp,media=video,clock-rate=90000,encoding-name=JPEG,payload=26" ! rtpjpegdepay ! jpegdec ! videoconvert ! autovideosink sync=false
+
+# Alternative: Use FFmpeg for streaming (simpler)
+# Stream MJPEG with FFmpeg over UDP:
+ffmpeg -re -i out.bin -f mjpeg udp://127.0.0.1:5000
+
+# Receive with FFplay:
+ffplay -f mjpeg udp://127.0.0.1:5000
+
+# Hardware H.264 Encoding (V4L2)
+# Software encoding (slower but works at any resolution):
+cat mjpeg.bin | ffmpeg -framerate 10 -i - -vf "scale=1920:-2" -c:v libx264 -preset ultrafast -crf 23 -pix_fmt yuv420p enc_software.mp4 -y
+
+# Hardware encoding (faster but resolution limited):
+cat mjpeg.bin | ffmpeg -framerate 10 -i - -vf "scale=640:480" -c:v h264_v4l2m2m -pix_fmt yuv420p -b:v 1000k enc_hw_small.mp4 -y
+cat mjpeg.bin | ffmpeg -framerate 10 -i - -vf "scale=1280:960" -c:v h264_v4l2m2m -pix_fmt yuv420p -b:v 1500k enc_hw_medium.mp4 -y  
+cat mjpeg.bin | ffmpeg -framerate 10 -i - -vf "scale=1600:1200" -c:v h264_v4l2m2m -pix_fmt yuv420p -b:v 2000k enc_hw_large.mp4 -y
+
+# HARDWARE ENCODER RESOLUTION LIMITS (tested):
+# V4L2 device reports max 1920x1920 but actual limit is 2,073,600 pixels (1920x1080)
+#
+# Working resolutions:
+#   640x480   = 307,200 pixels   (62fps encoding, 392K output)
+#   1280x960  = 1,228,800 pixels (45fps encoding, 1.7MB output) 
+#   1600x1200 = 1,920,000 pixels (28fps encoding, 2.3MB output)
+#   1920x1080 = 2,073,600 pixels (19fps encoding, 2.8MB output) -- MAXIMUM
+#
+# Failing resolutions (VIDIOC_STREAMON failed):
+#   1920x1200 = 2,304,000 pixels (exceeds pixel limit)
+#   1800x1350 = 2,430,000 pixels (exceeds pixel limit)
+#   1920x1440 = 2,764,800 pixels (exceeds pixel limit)
+#   1920x1920 = 3,686,400 pixels (exceeds pixel limit)
+#
+# Hardware encoder command for maximum resolution:
+cat mjpeg.bin | ffmpeg -framerate 10 -i - -vf "scale=1920:1080" -c:v h264_v4l2m2m -pix_fmt yuv420p -b:v 2500k enc_hw_1080p.mp4 -y
+
+# Note: V4L2 hardware encoder fails at 1920x1440 and above ("VIDIOC_STREAMON failed")
+# Maximum working resolution for h264_v4l2m2m: 1600x1200
+
+# Command that keeps correct timestamps
+rpicam-vid --codec mjpeg --framerate 10 --width 2592 --height 1944 --nopreview --shutter 30000 --gain 1.5 -t 5000 -o - | ffmpeg -f mjpeg -r 10 -i - -vf "scale=1600:1200,drawtext=text='%{localtime} PTS\: %{pts}s':fontsize=24:fontcolor=white:x=10:y=10" -c:v h264_v4l2m2m -pix_fmt yuv420p -r 10 -b:v 1500k enc_hw_large.mp4 -y
+
+# Final command
+rpicam-vid --codec mjpeg --framerate 10 --width 2592 --height 1944 --nopreview --shutter 30000 --gain 1.5 -t 300000 --save-pts pts.txt -o - | ffmpeg -f mjpeg -r 10 -i - -f alsa  -thread_queue_size 1024 -i "sysdefault:CARD=CinemaTM" -vf "scale=1600:1200,drawtext=text='%{localtime} PTS\: %{pts}s':fontsize=24:fontcolor=white:x=10:y=10" -c:v h264_v4l2m2m -pix_fmt yuv420p -async 1 -r 10 -b:v 1500k -c:a aac -b:a 128k -shortest enc_hw_large.mp4 -y
+
+
+"C:\Program Files\gstreamer\1.0\msvc_x86_64\bin\gst-launch-1.0.exe"
+
