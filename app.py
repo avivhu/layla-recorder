@@ -197,148 +197,84 @@ def collect_video_metadata() -> List[VideoMeta]:
 
 INDEX_TEMPLATE = """
 <!doctype html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Sleep Monitor Recordings</title>
+  <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    :root { color-scheme: dark; }
-    body {
-      margin: 0;
-      padding: 24px;
-      font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
-      background-color: #0f172a;
-      color: #f1f5f9;
-    }
-    h1 {
-      font-weight: 600;
-      margin-bottom: 24px;
-    }
-    .grid {
-      display: grid;
-      gap: 16px;
-      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    }
-    .tile {
-      background: linear-gradient(160deg, rgba(30, 64, 175, 0.6), rgba(6, 182, 212, 0.4));
-      border-radius: 16px;
-      overflow: hidden;
-      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.35);
-      text-decoration: none;
-      color: inherit;
-      display: flex;
-      flex-direction: column;
-      transition: transform 0.18s ease, box-shadow 0.18s ease;
-      position: relative;
-    }
-    .tile:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 24px 50px rgba(15, 23, 42, 0.45);
-    }
-    .tile img {
-      width: 100%;
-      height: 160px;
-      object-fit: cover;
-      background-color: rgba(15, 23, 42, 0.6);
-    }
-    .tile .info {
-      padding: 16px;
-      display: grid;
-      gap: 6px;
-    }
-    .tile .name {
-      font-size: 1rem;
-      font-weight: 600;
-      letter-spacing: 0.01em;
-      text-transform: capitalize;
-    }
-    .tile .timestamp {
-      font-size: 0.9rem;
-      opacity: 0.85;
-    }
-    .tile .size {
-      font-size: 0.85rem;
-      opacity: 0.7;
-    }
-    dialog {
-      border: none;
-      border-radius: 18px;
-      padding: 0;
-      max-width: min(960px, 92vw);
-      width: 100%;
-      background: rgba(15, 23, 42, 0.96);
-      color: inherit;
-      box-shadow: 0 16px 60px rgba(15, 23, 42, 0.6);
-    }
     dialog::backdrop {
-      background: rgba(15, 23, 42, 0.65);
+      background: rgba(15, 23, 42, 0.75);
       backdrop-filter: blur(4px);
-    }
-    dialog header {
-      padding: 18px 24px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-bottom: 1px solid rgba(148, 163, 184, 0.2);
-    }
-    dialog header h2 {
-      margin: 0;
-      font-size: 1.1rem;
-      font-weight: 600;
-    }
-    dialog header button {
-      background: none;
-      border: none;
-      color: inherit;
-      font-size: 1.5rem;
-      cursor: pointer;
-      padding: 4px;
-    }
-    dialog video {
-      width: 100%;
-      height: auto;
-      border-radius: 0 0 18px 18px;
-      outline: none;
-    }
-    .empty-state {
-      padding: 80px 0;
-      text-align: center;
-      opacity: 0.7;
-      font-size: 1.1rem;
     }
   </style>
 </head>
-<body>
-  <h1>Sleep Monitor Recordings</h1>
-  {% if videos %}
-    <div class="grid">
-      {% for video in videos %}
-        <a class="tile" href="#" data-video-url="{{ video.video_url }}" data-video-title="{{ video.display_name }}">
-          <img src="{{ video.thumbnail_url }}" alt="Thumbnail for {{ video.display_name }}" loading="lazy">
-          <div class="info">
-            <div class="name">{{ video.display_name }}</div>
-            <div class="timestamp">{{ video.timestamp_label }}</div>
-            <div class="size">{{ video.filesize_label }}</div>
-          </div>
-        </a>
-      {% endfor %}
-    </div>
-  {% else %}
-    <div class="empty-state">No recordings found in the recordings/ directory yet.</div>
-  {% endif %}
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+  <div class="container mx-auto px-6 py-8 max-w-7xl">
+    <h1 class="text-4xl font-bold mb-8 bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
+      Sleep Monitor Recordings
+    </h1>
+    
+    {% if videos %}
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+        {% for video in videos %}
+          <a href="#" 
+             class="group bg-gradient-to-br from-blue-900/40 to-cyan-900/30 rounded-2xl overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-200 hover:-translate-y-1 flex flex-col cursor-pointer"
+             data-video-url="{{ video.video_url }}" 
+             data-video-title="{{ video.display_name }}">
+            <div class="relative aspect-video bg-slate-900/60 overflow-hidden">
+              <img src="{{ video.thumbnail_url }}" 
+                   alt="Thumbnail for {{ video.display_name }}" 
+                   loading="lazy"
+                   class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200">
+              <div class="absolute inset-0 bg-gradient-to-t from-slate-900/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
+                <svg class="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/>
+                </svg>
+              </div>
+            </div>
+            <div class="p-4 flex flex-col gap-1.5">
+              <div class="text-base font-semibold capitalize truncate">
+                {{ video.display_name }}
+              </div>
+              <div class="text-sm text-slate-400">
+                {{ video.timestamp_label }}
+              </div>
+              <div class="text-xs text-slate-500">
+                {{ video.filesize_label }}
+              </div>
+            </div>
+          </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="text-center py-20 text-slate-400 text-lg">
+        No recordings found in the recordings/ directory yet.
+      </div>
+    {% endif %}
+  </div>
 
-  <dialog id="playerDialog">
-    <header>
-      <h2 id="dialogTitle">Recording</h2>
-      <button type="button" aria-label="Close">×</button>
-    </header>
-    <video id="dialogVideo" controls preload="metadata"></video>
+  <dialog id="playerDialog" 
+          class="bg-slate-900/95 backdrop-blur-sm rounded-2xl p-0 max-w-4xl w-11/12 border border-slate-700/50 shadow-2xl">
+    <div class="flex items-center justify-between p-5 border-b border-slate-700/50">
+      <h2 id="dialogTitle" class="text-lg font-semibold text-slate-100">Recording</h2>
+      <button type="button" 
+              id="closeDialog"
+              aria-label="Close"
+              class="text-slate-400 hover:text-slate-100 text-3xl leading-none transition-colors">
+        ×
+      </button>
+    </div>
+    <video id="dialogVideo" 
+           controls 
+           preload="metadata"
+           class="w-full rounded-b-2xl outline-none"></video>
   </dialog>
 
   <script>
     const dialog = document.getElementById('playerDialog');
-    const closeButton = dialog.querySelector('button');
+    const closeButton = document.getElementById('closeDialog');
     const titleEl = document.getElementById('dialogTitle');
     const videoEl = document.getElementById('dialogVideo');
 
@@ -355,7 +291,7 @@ INDEX_TEMPLATE = """
       closeDialog();
     });
 
-    document.querySelectorAll('.tile').forEach(tile => {
+    document.querySelectorAll('a[data-video-url]').forEach(tile => {
       tile.addEventListener('click', event => {
         event.preventDefault();
         const videoUrl = tile.dataset.videoUrl;
