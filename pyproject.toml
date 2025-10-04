@@ -8,4 +8,5 @@ dependencies = [
     "opencv-python>=4.8.0",
     "ruff>=0.13.2",
     "ty>=0.0.1a21",
+    "flask>=3.0.0",
 ]
